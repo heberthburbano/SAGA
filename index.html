@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dispatch Coordinator RP</title>
+    <!-- Google Fonts: Outfit for a modern, friendly vibe -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Main Styles -->
+    <link rel="stylesheet" href="style.css">
+    <!-- Font Awesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+
+<body>
+
+    <div class="app-container">
+
+        <!-- Header -->
+        <header class="app-header">
+            <div class="logo-area">
+                <i class="fa-solid fa-tower-broadcast"></i>
+                <h1>DISPATCH COORDINATOR</h1>
+            </div>
+            <button id="theme-toggle" class="theme-toggle" aria-label="Cambiar Tema">
+                <i class="fa-solid fa-moon"></i>
+            </button>
+        </header>
+
+        <!-- Main 3-Column Layout -->
+        <main class="main-grid">
+
+            <!-- COLUMN 1: LCSCO (Norte) -->
+            <section class="column lcsco" id="col-lcsco">
+                <header class="column-header">
+                    <div class="agency-badge">
+                        <i class="fa-solid fa-sheriff-badge"></i>
+                    </div>
+                    <h2>LCSCO</h2>
+                    <span class="subtitle">Norte</span>
+                </header>
+
+                <div class="feed-container" id="feed-lcsco">
+                    <!-- Robbery Cards will be injected here -->
+                    <div class="empty-state">Sin novedades en el Norte</div>
+                </div>
+            </section>
+
+            <!-- COLUMN 2: CHAT (Centro) -->
+            <section class="column chat" id="col-chat">
+                <header class="column-header">
+                    <h2>Central de Comunicaciones</h2>
+                    <span class="subtitle">Chat Interagencias</span>
+                </header>
+
+                <div class="chat-messages" id="chat-messages">
+                    <!-- Chat messages -->
+                </div>
+
+                <form class="chat-input-area" id="chat-form">
+                    <input type="text" id="chat-input" placeholder="Escribe un mensaje..." autocomplete="off">
+                    <button type="submit" class="btn-icon"><i class="fa-solid fa-paper-plane"></i></button>
+                </form>
+            </section>
+
+            <!-- COLUMN 3: LSPD (Sur) -->
+            <section class="column lspd" id="col-lspd">
+                <header class="column-header">
+                    <div class="agency-badge">
+                        <i class="fa-solid fa-shield-halved"></i>
+                    </div>
+                    <h2>LSPD</h2>
+                    <span class="subtitle">Sur</span>
+                </header>
+
+                <div class="feed-container" id="feed-lspd">
+                    <!-- Robbery Cards will be injected here -->
+                    <div class="empty-state">Sin novedades en el Sur</div>
+                </div>
+            </section>
+
+        </main>
+
+        <!-- Floating Action Button -->
+        <button id="btn-new-notice" class="fab">
+            <i class="fa-solid fa-plus"></i> NUEVO AVISO
+        </button>
+
+    </div>
+
+    <!-- Modal: Nuevo Aviso -->
+    <div id="modal-notice" class="modal-backdrop hidden">
+        <div class="modal-content glass-panel">
+            <div class="modal-header">
+                <h3>Nuevo Aviso de Robo</h3>
+                <button id="btn-close-modal" class="btn-close"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <form id="form-notice">
+
+                <div class="form-group">
+                    <label>Jurisdicción</label>
+                    <div class="radio-group">
+                        <label class="radio-card lcsco-radio">
+                            <input type="radio" name="zone" value="norte" required>
+                            <span class="radio-content">
+                                <span class="radio-title">LCSCO</span>
+                                <span class="radio-sub">Norte</span>
+                            </span>
+                        </label>
+                        <label class="radio-card lspd-radio">
+                            <input type="radio" name="zone" value="sur" required>
+                            <span class="radio-content">
+                                <span class="radio-title">LSPD</span>
+                                <span class="radio-sub">Sur</span>
+                            </span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="input-band">Banda / Grupo</label>
+                    <input type="text" id="input-band" placeholder="Ej. Los Vagos" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="input-color">Color Identificativo</label>
+                    <div class="color-picker-wrapper">
+                        <input type="color" id="input-color" value="#ff0000">
+                        <span id="color-hex">#ff0000</span>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="input-robbery">Tipo de Robo / Incidente</label>
+                    <select id="input-robbery" required>
+                        <option value="" disabled selected>Selecciona el robo...</option>
+                        <option value="Yate">Yate</option>
+                        <option value="Ayuntamiento">Ayuntamiento</option>
+                        <option value="Galería de Arte">Galería de Arte</option>
+                        <option value="Life Invader">Life Invader</option>
+                        <option value="Banco Sandy">Banco Sandy</option>
+                        <option value="Furgón Blindado">Furgón Blindado</option>
+                        <option value="Furgón de Merryweather">Furgón de Merryweather</option>
+                    </select>
+                </div>
+
+                <div class="modal-actions">
+                    <button type="submit" class="btn-primary">Publicar Aviso</button>
+                </div>
+
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Identidad (Bienvenida) -->
+    <div id="identity-modal" class="modal-backdrop active" style="z-index: 200;">
+        <div class="modal-content glass-panel" style="text-align: center;">
+            <div class="modal-header" style="justify-content: center; margin-bottom: 20px;">
+                <h3>Identificación de Agente</h3>
+            </div>
+
+            <p style="color: var(--text-secondary); margin-bottom: 25px;">
+                Por favor, identifícate para acceder a la central.
+            </p>
+
+            <div class="form-group">
+                <input type="text" id="agent-name" placeholder="Nombre del Agente (Ej. Smith)" autocomplete="off">
+            </div>
+
+            <div class="form-group">
+                <label style="margin-top: 20px; margin-bottom: 15px;">Selecciona tu Facción</label>
+                <div class="radio-group">
+                    <button type="button" id="btn-faction-lcsco" class="faction-btn lcsco-btn">
+                        <i class="fa-solid fa-sheriff-badge"></i>
+                        <span>LCSCO</span>
+                    </button>
+                    <button type="button" id="btn-faction-lspd" class="faction-btn lspd-btn">
+                        <i class="fa-solid fa-shield-halved"></i>
+                        <span>LSPD</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase App (Modular) -->
+    <script type="module" src="script.js"></script>
+</body>
+
+</html>
