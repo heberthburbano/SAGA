@@ -295,6 +295,10 @@ if (db) {
                     if (data.status === 'progress') existingCard.classList.add('status-progress');
                     if (data.status === 'completed') existingCard.classList.add('status-completed');
 
+                    // Actualizar texto del badge
+                    const badge = existingCard.querySelector('.status-badge');
+                    if (badge) badge.textContent = getStatusText(data.status);
+
                     // Actualizar status toggle button icon/action si fuera necesario (aquí es genérico)
                     const statusBtn = existingCard.querySelector('.btn-status-toggle');
                     if (statusBtn) statusBtn.setAttribute('onclick', `toggleStatus('${id}', '${data.status || 'pending'}')`);
@@ -474,6 +478,7 @@ function createRobberyCard(docId, data) {
                 <span class="band-tag" style="background:${data.color}40; color:${data.color}; border:1px solid ${data.color}">
                     ${data.band}
                 </span>
+                <span class="status-badge">${getStatusText(status)}</span>
                 <span><i class="fa-regular fa-clock"></i> ${timeStr}</span>
             </div>
         </div>
@@ -493,6 +498,12 @@ function createRobberyCard(docId, data) {
         </div>
     `;
     return div;
+}
+
+function getStatusText(status) {
+    if (status === 'progress') return "🚨 EN CURSO";
+    if (status === 'completed') return "✅ FINALIZADO";
+    return "⏳ PENDIENTE";
 }
 
 // Global functions for inline HTML events
