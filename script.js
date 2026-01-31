@@ -25,6 +25,29 @@ const firebaseConfig = {
     appId: "1:1018730676406:web:145458463c495ac02ba617"
 };
 
+// --- DRAG AND DROP (SORTABLEJS) ---
+// Configuración visual local
+function initSortable() {
+    const feedLCSCO = document.getElementById('feed-lcsco');
+    const feedLSPD = document.getElementById('feed-lspd');
+
+    const sortableConfig = {
+        animation: 150,
+        ghostClass: 'blue-background-class',
+        // No guardamos orden en DB, es solo visual
+        onEnd: function (evt) {
+            // Se podría guardar en localStorage si quisiéramos persistencia local
+            // console.log('Item movido', evt.item);
+        }
+    };
+
+    if (feedLCSCO) new Sortable(feedLCSCO, sortableConfig);
+    if (feedLSPD) new Sortable(feedLSPD, sortableConfig);
+}
+
+// Inicializar cuando el DOM esté listo
+document.addEventListener('DOMContentLoaded', initSortable);
+
 // Inicializar Firebase (Solo si hay config, para evitar error en consola si está vacío)
 let db;
 try {
@@ -231,32 +254,63 @@ if (db) {
 
     // 1. ESCUCHAR ROBOS
     // Filtramos por fecha creada >= lastTsunami
+    // CAMBIO: Usamos timestamp en lugar de createdAt para el filtro y orden ASC
     const qRobos = query(
         collection(db, "solicitudes_robos"),
-        where("createdAt", ">=", lastTsunami),
-        orderBy("createdAt", "desc")
+        where("timestamp", ">=", lastTsunami),
+        orderBy("timestamp", "asc")
     );
 
     onSnapshot(qRobos, (snapshot) => {
-        // Limpiamos los feeds antes de repintar (o podríamos hacer diffing, pero esto es simple)
-        if (feedLCSCO) feedLCSCO.innerHTML = '';
-        if (feedLSPD) feedLSPD.innerHTML = '';
+        snapshot.docChanges().forEach((change) => {
+            const data = change.doc.data();
+            const id = change.doc.id;
 
-        snapshot.forEach((docSnap) => {
-            const data = docSnap.data();
-            const id = docSnap.id;
-            const card = createRobberyCard(id, data);
+            // Determinar contenedor
+            let container = null;
+            if (data.zone === 'norte') container = feedLCSCO;
+            else container = feedLSPD;
 
-            if (data.zone === 'norte') {
-                if (feedLCSCO) feedLCSCO.appendChild(card);
-            } else {
-                if (feedLSPD) feedLSPD.appendChild(card);
+            if (!container) return;
+
+            if (change.type === "added") {
+                // Crear y añadir AL FINAL
+                const card = createRobberyCard(id, data);
+                // Remover empty state si existe
+                const empty = container.querySelector('.empty-state');
+                if (empty) empty.remove();
+
+                container.appendChild(card);
+            }
+            if (change.type === "modified") {
+                // Buscar elemento existente
+                const existingCard = document.getElementById(`robbery-${id}`);
+                if (existingCard) {
+                    // Reemplazar con nueva versión (más fácil que actualizar in-place pieza a pieza)
+                    // Para evitar parpadeos visuales fuertes, podríamos actualizar solo clases y textos,
+                    // pero `createRobberyCard` es rápido. Vamos a intentar actualizar in-place lo crítico.
+
+                    // Actualizar STATUS classes
+                    existingCard.classList.remove('status-progress', 'status-completed');
+                    if (data.status === 'progress') existingCard.classList.add('status-progress');
+                    if (data.status === 'completed') existingCard.classList.add('status-completed');
+
+                    // Actualizar status toggle button icon/action si fuera necesario (aquí es genérico)
+                    const statusBtn = existingCard.querySelector('.btn-status-toggle');
+                    if (statusBtn) statusBtn.setAttribute('onclick', `toggleStatus('${id}', '${data.status || 'pending'}')`);
+                }
+            }
+            if (change.type === "removed") {
+                const existingCard = document.getElementById(`robbery-${id}`);
+                if (existingCard) existingCard.remove();
+
+                // Si no quedan hijos, poner empty state
+                if (container.children.length === 0) {
+                    if (data.zone === 'norte') container.innerHTML = '<div class="empty-state">Sin novedades en el Norte</div>';
+                    else container.innerHTML = '<div class="empty-state">Sin novedades en el Sur</div>';
+                }
             }
         });
-
-        // Restore empty states if needed
-        if (feedLCSCO && feedLCSCO.children.length === 0) feedLCSCO.innerHTML = '<div class="empty-state">Sin novedades en el Norte</div>';
-        if (feedLSPD && feedLSPD.children.length === 0) feedLSPD.innerHTML = '<div class="empty-state">Sin novedades en el Sur</div>';
     });
 
     // 2. CREAR NUEVO AVISO
@@ -310,45 +364,49 @@ if (db) {
 
     onSnapshot(qChat, (snapshot) => {
         if (!chatMessages) return;
-        chatMessages.innerHTML = '';
-        snapshot.forEach((docSnap) => {
-            const data = docSnap.data();
-            const elm = document.createElement('div');
 
-            // Si el mensaje tiene localId, comparamos para ver si es 'own'
-            // Si no (mensajes viejos), asumimos 'others'
-            let isOwn = false;
-            if (currentUser && data.localId === currentUser.localId) {
-                isOwn = true;
-            } else if (!currentUser && data.localId === getLocalUserId()) {
-                // Fallback por si no hay usuario (legacy)
-                isOwn = true;
+        snapshot.docChanges().forEach((change) => {
+            if (change.type === "added") {
+                const data = change.doc.data();
+                const elm = document.createElement('div');
+
+                // Si el mensaje tiene localId, comparamos para ver si es 'own'
+                let isOwn = false;
+                // Check current user logic
+                let currentLocalId = null;
+                if (currentUser) currentLocalId = currentUser.localId;
+                else currentLocalId = getLocalUserId(); // Fallback
+
+                if (data.localId && data.localId === currentLocalId) {
+                    isOwn = true;
+                }
+
+                elm.className = `message ${isOwn ? 'own' : 'others'}`;
+
+                // Format time
+                let timeStr = "";
+                if (data.createdAt && data.createdAt.toDate) {
+                    const date = data.createdAt.toDate();
+                    timeStr = date.getHours().toString().padStart(2, '0') + ":" + date.getMinutes().toString().padStart(2, '0');
+                }
+
+                // Determine user color class based on faction
+                const factionClass = data.faction ? `msg-user ${data.faction}` : 'msg-user';
+
+                elm.innerHTML = `
+                    <div class="msg-header">
+                        <span class="${factionClass}">${data.user || 'Agente'}</span>
+                        <span>${timeStr}</span>
+                    </div>
+                    ${data.text}
+                `;
+                chatMessages.appendChild(elm);
+
+                // Scroll to bottom only on add
+                chatMessages.scrollTop = chatMessages.scrollHeight;
             }
-
-            elm.className = `message ${isOwn ? 'own' : 'others'}`;
-
-            // Format time
-            let timeStr = "";
-            if (data.createdAt && data.createdAt.toDate) {
-                const date = data.createdAt.toDate();
-                timeStr = date.getHours().toString().padStart(2, '0') + ":" + date.getMinutes().toString().padStart(2, '0');
-            }
-
-            // Determine user color class based on faction
-            const factionClass = data.faction ? `msg-user ${data.faction}` : 'msg-user';
-
-            elm.innerHTML = `
-                <div class="msg-header">
-                    <span class="${factionClass}">${data.user || 'Agente'}</span>
-                    <span>${timeStr}</span>
-                </div>
-                ${data.text}
-            `;
-            chatMessages.appendChild(elm);
+            // Modified/Removed not strictly needed for chat usually, but good practice to handle if editing allowed later
         });
-
-        // Scroll to bottom
-        chatMessages.scrollTop = chatMessages.scrollHeight;
     });
 
     // Enviar Mensaje Chat
@@ -385,6 +443,7 @@ if (db) {
 function createRobberyCard(docId, data) {
     const div = document.createElement('div');
     div.className = 'robbery-card';
+    div.id = `robbery-${docId}`; // ID único para updates
 
     // Status Logic
     const status = data.status || 'pending';
