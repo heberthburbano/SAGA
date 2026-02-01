@@ -25,9 +25,14 @@
                 <i class="fa-solid fa-tower-broadcast"></i>
                 <h1>DISPATCH COORDINATOR</h1>
             </div>
-            <button id="theme-toggle" class="theme-toggle" aria-label="Cambiar Tema">
-                <i class="fa-solid fa-moon"></i>
-            </button>
+            <div style="display: flex; gap: 10px;">
+                <button id="btn-admin" class="theme-toggle" aria-label="Administración">
+                    <i class="fa-solid fa-gear"></i>
+                </button>
+                <button id="theme-toggle" class="theme-toggle" aria-label="Cambiar Tema">
+                    <i class="fa-solid fa-moon"></i>
+                </button>
+            </div>
         </header>
 
         <!-- Main 3-Column Layout -->
@@ -45,7 +50,10 @@
 
                 <div class="feed-container" id="feed-lcsco">
                     <!-- Robbery Cards will be injected here -->
-                    <div class="empty-state">Sin novedades en el Norte</div>
+                    <div class="empty-state">
+                        <i class="fa-solid fa-satellite-dish"></i>
+                        <p>Sin novedades en el Norte</p>
+                    </div>
                 </div>
             </section>
 
@@ -78,7 +86,10 @@
 
                 <div class="feed-container" id="feed-lspd">
                     <!-- Robbery Cards will be injected here -->
-                    <div class="empty-state">Sin novedades en el Sur</div>
+                    <div class="empty-state">
+                        <i class="fa-solid fa-shield-halved"></i>
+                        <p>Sin novedades en el Sur</p>
+                    </div>
                 </div>
             </section>
 
@@ -137,14 +148,8 @@
                 <div class="form-group">
                     <label for="input-robbery">Tipo de Robo / Incidente</label>
                     <select id="input-robbery" required>
-                        <option value="" disabled selected>Selecciona el robo...</option>
-                        <option value="Yate">Yate</option>
-                        <option value="Ayuntamiento">Ayuntamiento</option>
-                        <option value="Galería de Arte">Galería de Arte</option>
-                        <option value="Life Invader">Life Invader</option>
-                        <option value="Banco Sandy">Banco Sandy</option>
-                        <option value="Furgón Blindado">Furgón Blindado</option>
-                        <option value="Furgón de Merryweather">Furgón de Merryweather</option>
+                        <option value="" disabled selected>Cargando lista...</option>
+                        <!-- Dynamic Options will be injected -->
                     </select>
                 </div>
 
@@ -153,6 +158,66 @@
                 </div>
 
             </form>
+        </div>
+    </div>
+
+    <!-- Modal: Password Check -->
+    <div id="password-modal" class="modal-backdrop hidden" style="z-index: 10002;">
+        <div class="modal-content glass-panel" style="max-width: 400px; text-align: center;">
+            <div class="modal-header" style="justify-content: center;">
+                <h3><i class="fa-solid fa-key"></i> Acceso Administrativo</h3>
+            </div>
+
+            <form id="form-admin-password">
+                <div class="form-group">
+                    <div class="password-input-wrapper">
+                        <input type="password" id="admin-password-input" placeholder="Introduce la clave de acceso..."
+                            autocomplete="current-password" required>
+                        <i class="fa-solid fa-eye" id="toggle-password-visibility"></i>
+                    </div>
+                </div>
+                <div class="modal-actions" style="display: flex; gap: 10px; justify-content: center; margin-top: 20px;">
+                    <button type="button" id="btn-cancel-password" class="btn-secondary">Cancelar</button>
+                    <button type="submit" class="btn-primary"
+                        style="background: var(--status-progress-color); color: white;">Entrar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Admin Panel -->
+    <div id="admin-modal" class="modal-backdrop hidden" style="z-index: 9999;">
+        <div class="modal-content glass-panel" style="max-width: 600px;">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-lock"></i> Panel de Administración</h3>
+                <button id="btn-close-admin" class="btn-close"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <!-- SECTION A: Robbery Configuration -->
+            <div id="admin-section-robberies" class="admin-section">
+                <h4>Gestión de Robos</h4>
+                <div class="scrollable-list" id="admin-robbery-list">
+                    <!-- Dynamic List Items -->
+                    <div class="loading-spinner">Cargando...</div>
+                </div>
+
+                <form id="admin-add-robbery" class="flat-form">
+                    <input type="text" id="new-robbery-name" placeholder="Nuevo tipo de robo..." required>
+                    <input type="color" id="new-robbery-color" value="#ffffff">
+                    <button type="submit" class="btn-micro-add"><i class="fa-solid fa-plus"></i></button>
+                </form>
+            </div>
+
+            <hr class="separator">
+
+            <!-- SECTION B: Danger Zone -->
+            <div id="admin-section-danger" class="admin-section danger-zone">
+                <h4><i class="fa-solid fa-triangle-exclamation"></i> ZONA DE PELIGRO</h4>
+                <p>Esta acción es irreversible. Se borrarán todos los avisos y el chat.</p>
+                <button id="btn-nuke" class="btn-nuke">
+                    <i class="fa-solid fa-radiation"></i> BORRAR TODOS LOS DATOS (NUKE)
+                </button>
+            </div>
         </div>
     </div>
 
@@ -189,6 +254,25 @@
 
     <!-- SortableJS for Drag and Drop -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+
+    <!-- Toast Container -->
+    <div id="toast-container"></div>
+
+    <!-- Custom Alert Modal (Reusable for Alert & Confirm) -->
+    <div id="custom-alert-modal" class="modal-backdrop hidden" style="z-index: 10000;">
+        <div class="modal-content glass-panel alert-content">
+            <div class="modal-header alert-header">
+                <h3 id="alert-title">Alerta</h3>
+            </div>
+            <div class="alert-body">
+                <p id="alert-message">Mensaje de alerta...</p>
+            </div>
+            <div class="alert-actions">
+                <button id="btn-alert-cancel" class="btn-secondary hidden">Cancelar</button>
+                <button id="btn-alert-confirm" class="btn-primary">Aceptar</button>
+            </div>
+        </div>
+    </div>
 
     <!-- Firebase App (Modular) -->
     <script type="module" src="script.js"></script>

@@ -11,7 +11,8 @@ import {
     deleteDoc,
     updateDoc,
     doc,
-    serverTimestamp
+    serverTimestamp,
+    getDocs
 } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
 import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
 
@@ -176,7 +177,7 @@ if (currentUser) {
 const saveIdentity = (faction) => {
     const name = inputAgentName.value.trim();
     if (name.length < 2) {
-        alert("Por favor, introduce un nombre de agente válido.");
+        showToast("Por favor, introduce un nombre de agente válido.", "error");
         return;
     }
 
@@ -316,8 +317,19 @@ const startApp = () => {
 
                 // Si no quedan hijos, poner empty state
                 if (container.children.length === 0) {
-                    if (data.zone === 'norte') container.innerHTML = '<div class="empty-state">Sin novedades en el Norte</div>';
-                    else container.innerHTML = '<div class="empty-state">Sin novedades en el Sur</div>';
+                    if (data.zone === 'norte') {
+                        container.innerHTML = `
+                            <div class="empty-state">
+                                <i class="fa-solid fa-satellite-dish"></i>
+                                <p>Sin novedades en el Norte</p>
+                            </div>`;
+                    } else {
+                        container.innerHTML = `
+                            <div class="empty-state">
+                                <i class="fa-solid fa-shield-halved"></i>
+                                <p>Sin novedades en el Sur</p>
+                            </div>`;
+                    }
                 }
             }
         });
@@ -329,7 +341,10 @@ const startApp = () => {
             e.preventDefault();
 
             const zoneInput = document.querySelector('input[name="zone"]:checked');
-            if (!zoneInput) return alert("Selecciona una jurisdicción");
+            if (!zoneInput) {
+                showToast("Selecciona una jurisdicción", "error");
+                return;
+            }
 
             const zone = zoneInput.value;
             const band = document.getElementById('input-band').value;
@@ -337,7 +352,7 @@ const startApp = () => {
             const robbery = document.getElementById('input-robbery').value;
 
             if (!robbery) {
-                alert("Selecciona un tipo de robo.");
+                showToast("Selecciona un tipo de robo.", "error");
                 return;
             }
 
@@ -360,7 +375,7 @@ const startApp = () => {
 
             } catch (error) {
                 console.error("Error añadiendo aviso: ", error);
-                alert("Error al publicar aviso");
+                showModalAlert("Error", "Error al publicar aviso");
             }
         });
     }
@@ -428,7 +443,7 @@ const startApp = () => {
 
             // Ensure we have a user
             if (!currentUser) {
-                alert("Debes identificarte primero (Refresca la página).");
+                showToast("Debes identificarte primero (Refresca la página).", "error");
                 return;
             }
 
@@ -446,15 +461,235 @@ const startApp = () => {
             }
         });
     }
+    // 4. CONFIGURACIÓN DINÁMICA DE ROBOS (ADMIN) & SELECCIÓN
+    const qConfig = query(collection(db, "config_robos"), orderBy("name"));
+    const selectRobbery = document.getElementById('input-robbery');
+    const listAdminRobberies = document.getElementById('admin-robbery-list');
+
+    onSnapshot(qConfig, (snapshot) => {
+        // A) Si está vacío, sembramos datos por defecto (SEEDING)
+        if (snapshot.empty) {
+            console.log("Configuración vacía, creando defaults...");
+            const defaults = [
+                { name: "Yate", color: "#3498db" },
+                { name: "Ayuntamiento", color: "#9b59b6" },
+                { name: "Galería de Arte", color: "#e67e22" },
+                { name: "Life Invader", color: "#e74c3c" },
+                { name: "Banco Sandy", color: "#2ecc71" },
+                { name: "Furgón Blindado", color: "#f1c40f" },
+                { name: "Furgón de Merryweather", color: "#34495e" }
+            ];
+            defaults.forEach(d => addDoc(collection(db, "config_robos"), d));
+            return;
+        }
+
+        // B) Renderizar Select Principal (Usuario)
+        if (selectRobbery) {
+            selectRobbery.innerHTML = '<option value="" disabled selected>Selecciona el robo...</option>';
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                const opt = document.createElement('option');
+                opt.value = data.name;
+                opt.textContent = data.name;
+                selectRobbery.appendChild(opt);
+            });
+        }
+
+        // C) Renderizar Lista Admin
+        if (listAdminRobberies) {
+            listAdminRobberies.innerHTML = '';
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                const item = document.createElement('div');
+                item.className = 'admin-item';
+                item.innerHTML = `
+                    <div class="item-info">
+                        <span class="color-dot" style="background:${data.color}"></span>
+                        <span>${data.name}</span>
+                    </div>
+                    <button class="btn-trash" onclick="deleteRobberyConfig('${doc.id}')">
+                        <i class="fa-solid fa-trash"></i>
+                    </button>
+                `;
+                listAdminRobberies.appendChild(item);
+            });
+        }
+    });
+
+    // --- ACCIONES ADMIN ---
+
+    // Auth & Modal Opening
+    const btnAdmin = document.getElementById('btn-admin');
+    const adminModal = document.getElementById('admin-modal');
+    const btnCloseAdmin = document.getElementById('btn-close-admin');
+    const formAddRobbery = document.getElementById('admin-add-robbery');
+    const btnNuke = document.getElementById('btn-nuke');
+
+    // Password Modal Logic
+    const passwordModal = document.getElementById('password-modal');
+    const passwordForm = document.getElementById('form-admin-password');
+    const passwordInput = document.getElementById('admin-password-input');
+    const btnCancelPassword = document.getElementById('btn-cancel-password');
+    const togglePasswordBtn = document.getElementById('toggle-password-visibility');
+
+    const togglePasswordModal = (show) => {
+        if (!passwordModal) return;
+        if (show) {
+            passwordModal.classList.remove('hidden');
+            requestAnimationFrame(() => {
+                passwordModal.classList.add('active');
+                if (passwordInput) {
+                    passwordInput.focus();
+                    passwordInput.setAttribute('type', 'password'); // Reset to password
+                }
+                if (togglePasswordBtn) {
+                    togglePasswordBtn.classList.remove('fa-eye-slash');
+                    togglePasswordBtn.classList.add('fa-eye');
+                }
+            });
+        } else {
+            passwordModal.classList.remove('active');
+            setTimeout(() => {
+                passwordModal.classList.add('hidden');
+                if (passwordInput) {
+                    passwordInput.value = ''; // Clear on close
+                    passwordInput.setAttribute('type', 'password'); // Reset for safety
+                }
+                if (togglePasswordBtn) {
+                    togglePasswordBtn.classList.remove('fa-eye-slash');
+                    togglePasswordBtn.classList.add('fa-eye');
+                }
+            }, 300);
+        }
+    };
+
+    // Toggle Visibility Logic
+    if (togglePasswordBtn && passwordInput) {
+        togglePasswordBtn.addEventListener('click', function () {
+            const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+            passwordInput.setAttribute('type', type);
+            this.classList.toggle('fa-eye');
+            this.classList.toggle('fa-eye-slash');
+        });
+    }
+
+    if (btnAdmin) {
+        btnAdmin.addEventListener('click', () => {
+            togglePasswordModal(true);
+        });
+    }
+
+    if (btnCancelPassword) {
+        btnCancelPassword.addEventListener('click', () => togglePasswordModal(false));
+    }
+
+    if (passwordForm) {
+        passwordForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const pass = passwordInput.value;
+
+            if (pass === "PerroSanchez1379") {
+                togglePasswordModal(false);
+                // Open Admin Panel
+                if (adminModal) {
+                    adminModal.classList.remove('hidden');
+                    requestAnimationFrame(() => adminModal.classList.add('active'));
+                }
+            } else {
+                showToast("Contraseña incorrecta", "error");
+                passwordInput.value = '';
+                passwordInput.focus();
+            }
+        });
+    }
+
+    if (btnCloseAdmin) {
+        btnCloseAdmin.addEventListener('click', () => {
+            adminModal.classList.remove('active');
+            setTimeout(() => adminModal.classList.add('hidden'), 300);
+        });
+    }
+
+    // Añadir Nuevo Robo (Admin)
+    if (formAddRobbery) {
+        formAddRobbery.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const name = document.getElementById('new-robbery-name').value.trim();
+            const color = document.getElementById('new-robbery-color').value;
+
+            if (!name) return;
+
+            try {
+                await addDoc(collection(db, "config_robos"), { name, color });
+                formAddRobbery.reset();
+                showToast("Tipo de robo añadido", "success");
+            } catch (err) {
+                console.error(err);
+                showToast("Error al guardar", "error");
+            }
+        });
+    }
+
+    // NUKE DATOS (Danger Zone)
+    if (btnNuke) {
+        btnNuke.addEventListener('click', async () => {
+            const confirm1 = await showCustomConfirm("⚠️ ZONA DE PELIGRO", "¿Estás seguro de que quieres borrar TODOS los datos?");
+            if (!confirm1) return;
+
+            const confirm2 = await showCustomConfirm("⚠️ CONFIRMACIÓN FINAL", "Esta acción no se puede deshacer. ¿Proceder?");
+            if (!confirm2) return;
+
+            // Execute NUKE calling global helper (defined below to access db scope or usually cleaner in global if db/auth passed, 
+            // but here we are inside startApp where db is available. We can do it inline or call a function passing db).
+            // Let's do inline for simplicity of closure.
+            try {
+                showToast("Iniciando borrado masivo...", "info");
+
+                // Borrar Robos
+                const robosSnapshot = await getDocs(collection(db, "solicitudes_robos"));
+                const roboDeletes = robosSnapshot.docs.map(d => deleteDoc(d.ref));
+
+                // Borrar Chat
+                const chatSnapshot = await getDocs(collection(db, "chat_interno"));
+                const chatDeletes = chatSnapshot.docs.map(d => deleteDoc(d.ref));
+
+                await Promise.all([...roboDeletes, ...chatDeletes]);
+
+                showToast("limpieza Completa (NUKE)", "success");
+                adminModal.classList.remove('active');
+                setTimeout(() => adminModal.classList.add('hidden'), 300);
+
+            } catch (e) {
+                console.error(e);
+                showModalAlert("Error Critico", "Falló el borrado de datos.");
+            }
+        });
+    }
+};
+
+// --- GLOBAL ACTIONS (Admin Helpers) ---
+window.deleteRobberyConfig = async (id) => {
+    if (!db) return;
+    if (await showCustomConfirm("Eliminar Configuración", "¿Borrar este tipo de robo?")) {
+        try {
+            await deleteDoc(doc(db, "config_robos", id));
+        } catch (e) {
+            console.error(e);
+        }
+    }
 };
 
 // Autenticación Anónima antes de iniciar listeners
+// Autenticación Anónima antes de iniciar listeners
 if (auth) {
+    let appInitialized = false;
     signInAnonymously(auth)
         .then(() => {
             console.log("Autenticado anónimamente.");
             onAuthStateChanged(auth, (user) => {
-                if (user) {
+                if (user && !appInitialized) {
+                    appInitialized = true;
+                    console.log("Iniciando aplicación (Instancia única)...");
                     startApp();
                 }
             });
@@ -531,7 +766,8 @@ function getStatusText(status) {
 // Global functions for inline HTML events
 window.deleteRobbery = async (id) => {
     if (!db) return;
-    if (confirm("¿Finalizar este aviso?")) {
+    const confirmed = await showCustomConfirm("¿Finalizar Aviso?", "¿Estás seguro de que quieres finalizar este aviso?");
+    if (confirmed) {
         try {
             await deleteDoc(doc(db, "solicitudes_robos", id));
         } catch (e) {
@@ -567,3 +803,105 @@ function getLocalUserId() {
     }
     return id;
 }
+
+// --- HYBRID NOTIFICATION SYSTEM ---
+
+window.showToast = (message, type = 'info') => {
+    const container = document.getElementById('toast-container');
+    if (!container) return;
+
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+
+    // Icon selection
+    let iconClass = 'fa-circle-info';
+    if (type === 'success') iconClass = 'fa-circle-check';
+    if (type === 'error') iconClass = 'fa-triangle-exclamation';
+
+    toast.innerHTML = `
+        <i class="fa-solid ${iconClass} toast-icon"></i>
+        <span>${message}</span>
+    `;
+
+    container.appendChild(toast);
+
+    // Auto remove
+    setTimeout(() => {
+        toast.classList.add('hiding');
+        toast.addEventListener('animationend', () => toast.remove());
+    }, 3000);
+};
+
+window.showModalAlert = (title, message) => {
+    return new Promise((resolve) => {
+        const modal = document.getElementById('custom-alert-modal');
+        const titleEl = document.getElementById('alert-title');
+        const msgEl = document.getElementById('alert-message');
+        const btnConfirm = document.getElementById('btn-alert-confirm');
+        const btnCancel = document.getElementById('btn-alert-cancel');
+
+        if (!modal) return resolve();
+
+        titleEl.textContent = title;
+        msgEl.textContent = message;
+
+        // Ensure Cancel is hidden for simple alerts
+        btnCancel.classList.add('hidden');
+
+        // Remove previous listeners using clone
+        const newBtnConfirm = btnConfirm.cloneNode(true);
+        btnConfirm.parentNode.replaceChild(newBtnConfirm, btnConfirm);
+
+        // Add listener
+        newBtnConfirm.addEventListener('click', () => {
+            modal.classList.remove('active');
+            modal.classList.add('hidden');
+            resolve();
+        });
+
+        // Show modal
+        modal.classList.remove('hidden');
+        requestAnimationFrame(() => modal.classList.add('active'));
+    });
+};
+
+window.showCustomConfirm = (title, message) => {
+    return new Promise((resolve) => {
+        const modal = document.getElementById('custom-alert-modal');
+        const titleEl = document.getElementById('alert-title');
+        const msgEl = document.getElementById('alert-message');
+        const btnConfirm = document.getElementById('btn-alert-confirm');
+        const btnCancel = document.getElementById('btn-alert-cancel');
+
+        if (!modal) return resolve(false);
+
+        titleEl.textContent = title;
+        msgEl.textContent = message;
+
+        // Show Cancel button
+        btnCancel.classList.remove('hidden');
+
+        // Clone to clear listeners
+        const newBtnConfirm = btnConfirm.cloneNode(true);
+        btnConfirm.parentNode.replaceChild(newBtnConfirm, btnConfirm);
+
+        const newBtnCancel = btnCancel.cloneNode(true);
+        btnCancel.parentNode.replaceChild(newBtnCancel, btnCancel);
+
+        // Handlers
+        newBtnConfirm.addEventListener('click', () => {
+            modal.classList.remove('active');
+            modal.classList.add('hidden');
+            resolve(true);
+        });
+
+        newBtnCancel.addEventListener('click', () => {
+            modal.classList.remove('active');
+            modal.classList.add('hidden');
+            resolve(false);
+        });
+
+        modal.classList.remove('hidden');
+        requestAnimationFrame(() => modal.classList.add('active'));
+    });
+};
