@@ -13,17 +13,19 @@ import {
     doc,
     serverTimestamp
 } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
 
 // --- TU CONFIGURACIÓN AQUÍ ABAJO ---
 // IMPORTANTE: Pega tu objeto de configuración dentro de las llaves.
 const firebaseConfig = {
-    apiKey: "[GCP_API_KEY]",
+    apiKey: "AIzaSyBix3HVaY9vdMb83Tw1migARxaD4Q5Hplo",
     authDomain: "dispatch-rp-v1.firebaseapp.com",
     projectId: "dispatch-rp-v1",
     storageBucket: "dispatch-rp-v1.firebasestorage.app",
     messagingSenderId: "1018730676406",
     appId: "1:1018730676406:web:145458463c495ac02ba617"
 };
+
 
 // --- DRAG AND DROP (SORTABLEJS) ---
 // Configuración visual local
@@ -49,10 +51,11 @@ function initSortable() {
 document.addEventListener('DOMContentLoaded', initSortable);
 
 // Inicializar Firebase (Solo si hay config, para evitar error en consola si está vacío)
-let db;
+let db, auth;
 try {
     const app = initializeApp(firebaseConfig);
     db = getFirestore(app);
+    auth = getAuth(app);
 } catch (e) {
     console.warn("Esperando configuración de Firebase...", e);
 }
@@ -248,7 +251,10 @@ if (inputColor) {
 
 // --- FIREBASE LOGIC ---
 
-if (db) {
+// Lógica principal envuelta para ejecutar tras login
+const startApp = () => {
+    if (!db) return;
+
     const lastTsunami = getLastTsunamiTime();
     console.log("Filtrando datos desde el tsunami:", lastTsunami.toLocaleString());
 
@@ -440,6 +446,22 @@ if (db) {
             }
         });
     }
+};
+
+// Autenticación Anónima antes de iniciar listeners
+if (auth) {
+    signInAnonymously(auth)
+        .then(() => {
+            console.log("Autenticado anónimamente.");
+            onAuthStateChanged(auth, (user) => {
+                if (user) {
+                    startApp();
+                }
+            });
+        })
+        .catch((error) => {
+            console.error("Error en autenticación anónima:", error);
+        });
 }
 
 // --- HELPERS & GLOBALS ---
