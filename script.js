@@ -679,24 +679,81 @@ window.deleteRobberyConfig = async (id) => {
     }
 };
 
-// Autenticación Anónima antes de iniciar listeners
-// Autenticación Anónima antes de iniciar listeners
+// --- MOBILE TAB LOGIC (Refactorizado: Función independiente) ---
+function initMobileTabs() {
+    const mobileNavItems = document.querySelectorAll('.nav-item');
+    const cols = {
+        'col-lcsco': document.getElementById('col-lcsco'),
+        'col-chat': document.getElementById('col-chat'),
+        'col-lspd': document.getElementById('col-lspd')
+    };
+
+    // Función para cambiar vista
+    function updateMobileView(targetId) {
+        if (window.innerWidth > 768) return; // Solo móvil
+
+        // 1. Ocultar todo
+        Object.values(cols).forEach(col => {
+            if (col) col.classList.remove('active-view');
+        });
+
+        // 2. Mostrar target
+        const target = cols[targetId];
+        if (target) target.classList.add('active-view');
+
+        // 3. Actualizar botones
+        mobileNavItems.forEach(btn => {
+            if (btn.dataset.target === targetId) btn.classList.add('active');
+            else btn.classList.remove('active');
+        });
+    }
+
+    // Listeners
+    mobileNavItems.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            updateMobileView(btn.dataset.target);
+        });
+    });
+
+    // Inicialización al cargar o redimensionar
+    function checkMobileState() {
+        if (window.innerWidth <= 768) {
+            // Si no hay vista activa, activar Chat por defecto
+            if (!document.querySelector('.column.active-view')) {
+                // Intenta mantener la activa del botón, si no, chat
+                const activeBtn = document.querySelector('.nav-item.active');
+                const target = activeBtn ? activeBtn.dataset.target : 'col-chat';
+                updateMobileView(target);
+            }
+        } else {
+            // Resetear para escritorio (mostrar todo)
+            Object.values(cols).forEach(col => {
+                if (col) col.classList.remove('active-view');
+            });
+        }
+    }
+
+    checkMobileState();
+    window.addEventListener('resize', checkMobileState);
+}
+
+// Inicializar cuando el DOM esté listo
+document.addEventListener('DOMContentLoaded', initMobileTabs);
+
+// --- AUTENTICACIÓN (Al final del archivo) ---
 if (auth) {
     let appInitialized = false;
-    signInAnonymously(auth)
-        .then(() => {
-            console.log("Autenticado anónimamente.");
-            onAuthStateChanged(auth, (user) => {
-                if (user && !appInitialized) {
-                    appInitialized = true;
-                    console.log("Iniciando aplicación (Instancia única)...");
-                    startApp();
-                }
-            });
-        })
-        .catch((error) => {
-            console.error("Error en autenticación anónima:", error);
+    signInAnonymously(auth).then(() => {
+        console.log("Autenticado anónimamente.");
+        onAuthStateChanged(auth, (user) => {
+            if (user && !appInitialized) {
+                appInitialized = true;
+                console.log("Iniciando aplicación...");
+                startApp();
+            }
         });
+    }).catch((error) => console.error("Error Auth:", error));
 }
 
 // --- HELPERS & GLOBALS ---
