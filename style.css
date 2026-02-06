@@ -1340,3 +1340,70 @@ body.light-mode .empty-state i {
         /* Space for input */
     }
 }
+
+/* Badge de ID dentro de la tarjeta */
+.id-badge {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    border: 1px solid var(--glass-border);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 600;
+}
+
+/* Botón Editar (Hover Amarillo) */
+.btn-edit:hover {
+    background: rgba(255, 193, 7, 0.15) !important;
+    color: #ffc107 !important;
+}
+
+/* Botón Identidad Header */
+#btn-edit-identity:hover {
+    background: rgba(91, 139, 209, 0.2);
+    color: #fff;
+}
+
+/* --- FIX INPUT ID & NUMBERS --- */
+
+/* Aplicar estilo Glassmorphism a inputs numéricos */
+.form-group input[type="number"] {
+    width: 100%;
+    background: rgba(0, 0, 0, 0.2);
+    /* Fondo oscuro */
+    border: 1px solid #333;
+    padding: 12px;
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+body.light-mode .form-group input[type="number"] {
+    background: #f0f2f5;
+    border-color: #ddd;
+    color: #1c1e21;
+}
+
+.form-group input[type="number"]:focus {
+    border-color: #555;
+}
+
+/* Eliminar las flechas (spinners) del input number */
+/* Chrome, Safari, Edge, Opera */
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    appearance: none;
+    margin: 0;
+}
+
+/* Firefox */
+input[type=number] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+}

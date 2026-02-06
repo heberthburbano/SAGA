@@ -148,6 +148,12 @@ const chatMessages = document.getElementById('chat-messages');
 const chatForm = document.getElementById('chat-form');
 const chatInput = document.getElementById('chat-input');
 
+// NUEVAS VARIABLES GLOBALES
+const btnEditIdentity = document.getElementById('btn-edit-identity');
+const btnSubmitText = document.getElementById('btn-submit-text');
+const inputPlayerId = document.getElementById('input-player-id');
+let editingRobberyId = null; // Estado para saber si editamos
+
 
 // --- IDENTITY MANAGEMENT ---
 const identityModal = document.getElementById('identity-modal');
@@ -201,6 +207,16 @@ const saveIdentity = (faction) => {
 if (btnFactionLCSCO) btnFactionLCSCO.addEventListener('click', () => saveIdentity('norte'));
 if (btnFactionLSPD) btnFactionLSPD.addEventListener('click', () => saveIdentity('sur'));
 
+if (btnEditIdentity) {
+    btnEditIdentity.addEventListener('click', () => {
+        if (currentUser) {
+            inputAgentName.value = currentUser.name; // Rellenar nombre actual
+        }
+        identityModal.classList.remove('hidden');
+        requestAnimationFrame(() => identityModal.classList.add('active'));
+    });
+}
+
 
 // --- UI INTERACTION ---
 
@@ -223,6 +239,11 @@ const toggleModal = (show) => {
         modal.classList.remove('active');
         setTimeout(() => {
             modal.classList.add('hidden');
+
+            // Resetear estado al cerrar
+            formNotice.reset();
+            editingRobberyId = null;
+            if (btnSubmitText) btnSubmitText.textContent = "Publicar Aviso";
         }, 300);
     }
 };
@@ -290,25 +311,21 @@ const startApp = () => {
                 container.appendChild(card);
             }
             if (change.type === "modified") {
-                // Buscar elemento existente
+                // 1. Localizar la tarjeta antigua
                 const existingCard = document.getElementById(`robbery-${id}`);
-                if (existingCard) {
-                    // Reemplazar con nueva versión (más fácil que actualizar in-place pieza a pieza)
-                    // Para evitar parpadeos visuales fuertes, podríamos actualizar solo clases y textos,
-                    // pero `createRobberyCard` es rápido. Vamos a intentar actualizar in-place lo crítico.
 
-                    // Actualizar STATUS classes
-                    existingCard.classList.remove('status-progress', 'status-completed');
-                    if (data.status === 'progress') existingCard.classList.add('status-progress');
-                    if (data.status === 'completed') existingCard.classList.add('status-completed');
+                // 2. Crear una nueva tarjeta con los datos actualizados
+                const newCard = createRobberyCard(id, data);
 
-                    // Actualizar texto del badge
-                    const badge = existingCard.querySelector('.status-badge');
-                    if (badge) badge.textContent = getStatusText(data.status);
+                // 3. Reemplazar en el DOM (Swap)
+                if (existingCard && existingCard.parentNode) {
+                    existingCard.parentNode.replaceChild(newCard, existingCard);
 
-                    // Actualizar status toggle button icon/action si fuera necesario (aquí es genérico)
-                    const statusBtn = existingCard.querySelector('.btn-status-toggle');
-                    if (statusBtn) statusBtn.setAttribute('onclick', `toggleStatus('${id}', '${data.status || 'pending'}')`);
+                    // Efecto visual de actualización (parpadeo suave)
+                    newCard.animate([
+                        { opacity: 0.5, transform: 'scale(0.98)' },
+                        { opacity: 1, transform: 'scale(1)' }
+                    ], { duration: 300 });
                 }
             }
             if (change.type === "removed") {
@@ -335,47 +352,45 @@ const startApp = () => {
         });
     });
 
-    // 2. CREAR NUEVO AVISO
+    // 2. CREAR O EDITAR AVISO
     if (formNotice) {
         formNotice.addEventListener('submit', async (e) => {
             e.preventDefault();
-
             const zoneInput = document.querySelector('input[name="zone"]:checked');
-            if (!zoneInput) {
-                showToast("Selecciona una jurisdicción", "error");
-                return;
-            }
+            if (!zoneInput) { showToast("Selecciona jurisdicción", "error"); return; }
 
-            const zone = zoneInput.value;
-            const band = document.getElementById('input-band').value;
-            const color = document.getElementById('input-color').value;
-            const robbery = document.getElementById('input-robbery').value;
-
-            if (!robbery) {
-                showToast("Selecciona un tipo de robo.", "error");
-                return;
-            }
+            const formData = {
+                zone: zoneInput.value,
+                playerId: document.getElementById('input-player-id').value, // NUEVO CAMPO
+                band: document.getElementById('input-band').value,
+                color: document.getElementById('input-color').value,
+                robbery: document.getElementById('input-robbery').value
+            };
 
             try {
-                await addDoc(collection(db, "solicitudes_robos"), {
-                    zone,
-                    band,
-                    color,
-                    robbery,
-                    status: 'pending', // INITIAL STATUS
-                    createdAt: serverTimestamp(),
-                    timestamp: new Date()
-                });
+                if (editingRobberyId) {
+                    // MODO EDICIÓN: Actualizar existente
+                    await updateDoc(doc(db, "solicitudes_robos", editingRobberyId), formData);
+                    showToast("Aviso actualizado", "success");
+                } else {
+                    // MODO CREACIÓN: Nuevo documento
+                    formData.status = 'pending';
+                    formData.createdAt = serverTimestamp();
+                    formData.timestamp = new Date();
+                    await addDoc(collection(db, "solicitudes_robos"), formData);
+                    showToast("Aviso publicado", "success");
+                }
 
+                // Resetear estado
                 toggleModal(false);
                 formNotice.reset();
-                // Reset color default
+                editingRobberyId = null;
+                if (btnSubmitText) btnSubmitText.textContent = "Publicar Aviso";
                 if (inputColor) inputColor.value = "#ff0000";
-                if (colorHex) colorHex.textContent = "#ff0000";
 
             } catch (error) {
-                console.error("Error añadiendo aviso: ", error);
-                showModalAlert("Error", "Error al publicar aviso");
+                console.error(error);
+                showToast("Error al guardar", "error");
             }
         });
     }
@@ -758,24 +773,40 @@ if (auth) {
 
 // --- HELPERS & GLOBALS ---
 
+window.startEditRobbery = (id, data) => {
+    editingRobberyId = id; // Marcamos modo edición
+
+    // Rellenar formulario
+    if (inputPlayerId) inputPlayerId.value = data.playerId || '';
+    document.getElementById('input-band').value = data.band;
+    document.getElementById('input-color').value = data.color;
+    document.getElementById('input-robbery').value = data.robbery;
+    if (colorHex) colorHex.textContent = data.color;
+
+    // Marcar Radio Button correcto
+    const radios = document.getElementsByName('zone');
+    radios.forEach(r => {
+        if (r.value === data.zone) r.checked = true;
+    });
+
+    // Cambiar UI y abrir
+    if (btnSubmitText) btnSubmitText.textContent = "Guardar Cambios";
+    toggleModal(true);
+};
+
 function createRobberyCard(docId, data) {
     const div = document.createElement('div');
     div.className = 'robbery-card';
-    div.id = `robbery-${docId}`; // ID único para updates
+    div.id = `robbery-${docId}`;
 
-    // Status Logic
+    // Status logic
     const status = data.status || 'pending';
-    if (status === 'progress') {
-        div.classList.add('status-progress');
-    } else if (status === 'completed') {
-        div.classList.add('status-completed');
-    }
+    if (status === 'progress') div.classList.add('status-progress');
+    else if (status === 'completed') div.classList.add('status-completed');
 
-    // Border color logic (only if not completed/progress which have specific overrides, 
-    // but mostly we want the band color to show unless strictly overridden by CSS logic)
     div.style.borderLeftColor = data.color;
 
-    // Formatear hora
+    // Time logic
     let timeStr = "--:--";
     if (data.createdAt && data.createdAt.toDate) {
         const d = data.createdAt.toDate();
@@ -785,6 +816,7 @@ function createRobberyCard(docId, data) {
         timeStr = d.getHours().toString().padStart(2, '0') + ":" + d.getMinutes().toString().padStart(2, '0');
     }
 
+    // HTML Structure
     div.innerHTML = `
         <div class="card-info">
             <h4>${data.robbery}</h4>
@@ -792,25 +824,33 @@ function createRobberyCard(docId, data) {
                 <span class="band-tag" style="background:${data.color}40; color:${data.color}; border:1px solid ${data.color}">
                     ${data.band}
                 </span>
+                ${data.playerId ? `<span class="id-badge"><i class="fa-solid fa-id-card"></i> ${data.playerId}</span>` : ''}
                 <span class="status-badge">${getStatusText(status)}</span>
                 <span><i class="fa-regular fa-clock"></i> ${timeStr}</span>
             </div>
         </div>
         <div class="card-actions">
-            <!-- Botón Semáforo -->
-            <button class="btn-action-icon btn-status-toggle" 
-                    title="Cambiar Estado (Pendiente -> En Curso -> Terminado)"
-                    onclick="toggleStatus('${docId}', '${status}')">
+            <button class="btn-action-icon btn-edit" title="Editar Aviso">
+                <i class="fa-solid fa-pen-to-square"></i>
+            </button>
+            <button class="btn-action-icon btn-status-toggle" onclick="toggleStatus('${docId}', '${status}')">
                 <i class="fa-solid fa-traffic-light"></i>
             </button>
-            <!-- Botón Borrar (con btn-action-icon y btn-delete para estilo) -->
-            <button class="btn-action-icon btn-delete" 
-                    title="Archivar/Borrar" 
-                    onclick="deleteRobbery('${docId}')">
+            <button class="btn-action-icon btn-delete" onclick="deleteRobbery('${docId}')">
                 <i class="fa-solid fa-trash"></i>
             </button>
         </div>
     `;
+
+    // Listener para Editar
+    const btnEdit = div.querySelector('.btn-edit');
+    if (btnEdit) {
+        btnEdit.addEventListener('click', (e) => {
+            e.stopPropagation();
+            startEditRobbery(docId, data);
+        });
+    }
+
     return div;
 }
 
