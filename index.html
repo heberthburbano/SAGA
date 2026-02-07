@@ -43,17 +43,17 @@
         <!-- Main 3-Column Layout -->
         <main class="main-grid">
 
-            <!-- COLUMN 1: LCSCO (Norte) -->
-            <section class="column lcsco" id="col-lcsco">
+            <!-- COLUMN 1: LSCSO (Norte) -->
+            <section class="column lscso" id="col-lscso">
                 <header class="column-header">
                     <div class="agency-badge">
                         <i class="fa-solid fa-sheriff-badge"></i>
                     </div>
-                    <h2>LCSCO</h2>
+                    <h2>LSCSO</h2>
                     <span class="subtitle">Norte</span>
                 </header>
 
-                <div class="feed-container" id="feed-lcsco">
+                <div class="feed-container" id="feed-lscso">
                     <!-- Robbery Cards will be injected here -->
                     <div class="empty-state">
                         <i class="fa-solid fa-satellite-dish"></i>
@@ -102,7 +102,7 @@
 
         <!-- Mobile Navigation Bar -->
         <nav class="mobile-nav">
-            <button class="nav-item active" data-target="col-lcsco">
+            <button class="nav-item active" data-target="col-lscso">
                 <i class="fa-solid fa-sheriff-badge"></i>
                 <span>Norte</span>
             </button>
@@ -141,10 +141,10 @@
                 <div class="form-group">
                     <label>Jurisdicción</label>
                     <div class="radio-group">
-                        <label class="radio-card lcsco-radio">
+                        <label class="radio-card lscso-radio">
                             <input type="radio" name="zone" value="norte" required>
                             <span class="radio-content">
-                                <span class="radio-title">LCSCO</span>
+                                <span class="radio-title">LSCSO</span>
                                 <span class="radio-sub">Norte</span>
                             </span>
                         </label>
@@ -252,8 +252,11 @@
     <!-- Modal: Identidad (Bienvenida) -->
     <div id="identity-modal" class="modal-backdrop active" style="z-index: 200;">
         <div class="modal-content glass-panel" style="text-align: center;">
-            <div class="modal-header" style="justify-content: center; margin-bottom: 20px;">
+            <div class="modal-header" style="margin-bottom: 20px;">
                 <h3>Identificación de Agente</h3>
+                <button id="btn-close-identity" class="btn-close hidden" aria-label="Cerrar">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
             </div>
 
             <p style="color: var(--text-secondary); margin-bottom: 25px;">
@@ -267,9 +270,9 @@
             <div class="form-group">
                 <label style="margin-top: 20px; margin-bottom: 15px;">Selecciona tu Facción</label>
                 <div class="radio-group">
-                    <button type="button" id="btn-faction-lcsco" class="faction-btn lcsco-btn">
+                    <button type="button" id="btn-faction-lscso" class="faction-btn lscso-btn">
                         <i class="fa-solid fa-sheriff-badge"></i>
-                        <span>LCSCO</span>
+                        <span>LSCSO</span>
                     </button>
                     <button type="button" id="btn-faction-lspd" class="faction-btn lspd-btn">
                         <i class="fa-solid fa-shield-halved"></i>
@@ -279,6 +282,25 @@
             </div>
         </div>
     </div>
+
+    <!-- Tutorial Overlay (Solo el fondo oscuro) -->
+    <div id="tutorial-overlay" class="hidden"></div>
+
+    <!-- Tutorial Box (Hermano independiente, fuera de cualquier contenedor) -->
+    <div id="tutorial-box" class="glass-panel hidden">
+        <div class="tut-content">
+            <h3 id="tut-title">Título</h3>
+            <p id="tut-text">Texto explicativo...</p>
+        </div>
+        <div class="tut-footer">
+            <span id="tut-step-count">1/5</span>
+            <div class="tut-buttons">
+                <button id="btn-skip-tut" class="btn-secondary">Saltar</button>
+                <button id="btn-next-tut" class="btn-primary">Siguiente</button>
+            </div>
+        </div>
+    </div>
+
 
     <!-- SortableJS for Drag and Drop -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>

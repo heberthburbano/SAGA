@@ -31,7 +31,7 @@ const firebaseConfig = {
 // --- DRAG AND DROP (SORTABLEJS) ---
 // Configuración visual local
 function initSortable() {
-    const feedLCSCO = document.getElementById('feed-lcsco');
+    const feedLSCSO = document.getElementById('feed-lscso');
     const feedLSPD = document.getElementById('feed-lspd');
 
     const sortableConfig = {
@@ -44,7 +44,7 @@ function initSortable() {
         }
     };
 
-    if (feedLCSCO) new Sortable(feedLCSCO, sortableConfig);
+    if (feedLSCSO) new Sortable(feedLSCSO, sortableConfig);
     if (feedLSPD) new Sortable(feedLSPD, sortableConfig);
 }
 
@@ -142,7 +142,7 @@ const btnCloseModal = document.getElementById('btn-close-modal');
 const formNotice = document.getElementById('form-notice');
 const inputColor = document.getElementById('input-color');
 const colorHex = document.getElementById('color-hex');
-const feedLCSCO = document.getElementById('feed-lcsco');
+const feedLSCSO = document.getElementById('feed-lscso');
 const feedLSPD = document.getElementById('feed-lspd');
 const chatMessages = document.getElementById('chat-messages');
 const chatForm = document.getElementById('chat-form');
@@ -158,8 +158,9 @@ let editingRobberyId = null; // Estado para saber si editamos
 // --- IDENTITY MANAGEMENT ---
 const identityModal = document.getElementById('identity-modal');
 const inputAgentName = document.getElementById('agent-name');
-const btnFactionLCSCO = document.getElementById('btn-faction-lcsco');
+const btnFactionLSCSO = document.getElementById('btn-faction-lscso');
 const btnFactionLSPD = document.getElementById('btn-faction-lspd');
+const btnCloseIdentity = document.getElementById('btn-close-identity'); // NUEVO
 
 // Check Identity on Load
 let currentUser = JSON.parse(localStorage.getItem('dispatch_identity'));
@@ -177,6 +178,8 @@ if (currentUser) {
         identityModal.classList.remove('hidden');
         identityModal.classList.add('active');
     }
+    // Ocultar botón de cerrar en modo obligatorio (primera vez)
+    if (btnCloseIdentity) btnCloseIdentity.classList.add('hidden');
 }
 
 // Save Identity Function
@@ -200,20 +203,37 @@ const saveIdentity = (faction) => {
         identityModal.classList.remove('active');
         setTimeout(() => {
             identityModal.classList.add('hidden');
+            // Ocultar botón X después de cerrar
+            if (btnCloseIdentity) btnCloseIdentity.classList.add('hidden');
+            // Try start tutorial after closing identity
+            if (window.tryStartTutorial) window.tryStartTutorial();
         }, 300);
     }
 };
 
-if (btnFactionLCSCO) btnFactionLCSCO.addEventListener('click', () => saveIdentity('norte'));
+if (btnFactionLSCSO) btnFactionLSCSO.addEventListener('click', () => saveIdentity('norte'));
 if (btnFactionLSPD) btnFactionLSPD.addEventListener('click', () => saveIdentity('sur'));
 
 if (btnEditIdentity) {
     btnEditIdentity.addEventListener('click', () => {
         if (currentUser) {
             inputAgentName.value = currentUser.name; // Rellenar nombre actual
+            // Mostrar botón de cerrar (modo edición)
+            if (btnCloseIdentity) btnCloseIdentity.classList.remove('hidden');
         }
         identityModal.classList.remove('hidden');
         requestAnimationFrame(() => identityModal.classList.add('active'));
+    });
+}
+
+// Cerrar modal de identidad sin guardar (solo en modo edición)
+if (btnCloseIdentity) {
+    btnCloseIdentity.addEventListener('click', () => {
+        identityModal.classList.remove('active');
+        setTimeout(() => {
+            identityModal.classList.add('hidden');
+            btnCloseIdentity.classList.add('hidden'); // Ocultar para próxima apertura
+        }, 300);
     });
 }
 
@@ -296,7 +316,7 @@ const startApp = () => {
 
             // Determinar contenedor
             let container = null;
-            if (data.zone === 'norte') container = feedLCSCO;
+            if (data.zone === 'norte') container = feedLSCSO;
             else container = feedLSPD;
 
             if (!container) return;
@@ -679,6 +699,11 @@ const startApp = () => {
                 showModalAlert("Error Critico", "Falló el borrado de datos.");
             }
         });
+        // --- LÓGICA DE TSUNAMI (End of startApp logic block) ---
+        // Start Tutorial (Delayed) after all initial loads
+        setTimeout(() => {
+            if (window.tryStartTutorial) window.tryStartTutorial();
+        }, 500);
     }
 };
 
@@ -698,7 +723,7 @@ window.deleteRobberyConfig = async (id) => {
 function initMobileTabs() {
     const mobileNavItems = document.querySelectorAll('.nav-item');
     const cols = {
-        'col-lcsco': document.getElementById('col-lcsco'),
+        'col-lscso': document.getElementById('col-lscso'),
         'col-chat': document.getElementById('col-chat'),
         'col-lspd': document.getElementById('col-lspd')
     };
@@ -766,6 +791,10 @@ if (auth) {
                 appInitialized = true;
                 console.log("Iniciando aplicación...");
                 startApp();
+                // Verificación inicial de tutorial
+                setTimeout(() => {
+                    if (window.tryStartTutorial) window.tryStartTutorial();
+                }, 500);
             }
         });
     }).catch((error) => console.error("Error Auth:", error));
@@ -1002,3 +1031,173 @@ window.showCustomConfirm = (title, message) => {
         requestAnimationFrame(() => modal.classList.add('active'));
     });
 };
+
+// ---------------------------------------------------------
+// TUTORIAL SYSTEM (ONBOARDING)
+// ---------------------------------------------------------
+
+const tutorialSteps = [
+    {
+        target: null,
+        title: "👋 Bienvenido a Dispatch",
+        text: "Esta es tu central de mando. Vamos a ver cómo gestionar los avisos."
+    },
+    {
+        target: "#btn-new-notice",
+        title: "📝 Crear Aviso + ID",
+        text: "Pulsa aquí para registrar incidentes. Ahora incluye campo para la ID del Jugador y Jurisdicción."
+    },
+    {
+        target: ".robbery-card", // Intenta buscar una tarjeta
+        fallback: ".main-grid",  // Si no hay tarjetas, señala la rejilla entera
+        title: "🗂️ Gestión de Avisos",
+        text: "Aquí aparecen los avisos. Si hay tarjetas, puedes arrastrarlas para ordenar. Usa el semáforo 🚦 para cambiar estado o el lápiz ✏️ para editar."
+    },
+    {
+        target: "#col-chat",
+        title: "💬 Comunicación",
+        text: "Usa el chat central para coordinarte con otras unidades. Recuerda identificarte primero."
+    },
+    {
+        target: "#btn-edit-identity",
+        title: "🆔 Tu Identidad",
+        text: "Usa este botón para cambiar tu nombre de agente o facción sin tener que reiniciar la página."
+    }
+];
+
+let currentStepIndex = 0;
+const tutorialOverlay = document.getElementById('tutorial-overlay');
+const tutorialBox = document.getElementById('tutorial-box');
+const tutTitle = document.getElementById('tut-title');
+const tutText = document.getElementById('tut-text');
+const tutStepCount = document.getElementById('tut-step-count');
+const btnNextTut = document.getElementById('btn-next-tut');
+const btnSkipTut = document.getElementById('btn-skip-tut');
+
+window.tryStartTutorial = () => {
+    // 1. Verificar si ya se completó
+    if (localStorage.getItem('tutorial_completed') === 'true') return;
+
+    // 2. Verificar si hay modales conflictivos abiertos (Identidad)
+    const identityModal = document.getElementById('identity-modal');
+    if (identityModal && !identityModal.classList.contains('hidden')) {
+        console.log("Tutorial en espera: Modal de Identidad abierto.");
+        return;
+    }
+
+    // 3. Iniciar
+    startTutorial();
+};
+
+function startTutorial() {
+    currentStepIndex = 0;
+    // Activar AMBOS elementos (ahora son hermanos)
+    if (tutorialOverlay) {
+        tutorialOverlay.classList.remove('hidden');
+        requestAnimationFrame(() => tutorialOverlay.classList.add('active'));
+    }
+    if (tutorialBox) {
+        tutorialBox.classList.remove('hidden');
+        requestAnimationFrame(() => tutorialBox.classList.add('active'));
+    }
+    showStep(0);
+}
+
+function showStep(index) {
+    if (index >= tutorialSteps.length) {
+        endTutorial();
+        return;
+    }
+
+    const step = tutorialSteps[index];
+
+    // Limpieza previa
+    document.querySelectorAll('.tutorial-highlight').forEach(el => el.classList.remove('tutorial-highlight'));
+
+    // Textos
+    tutTitle.textContent = step.title;
+    tutText.textContent = step.text;
+    tutStepCount.textContent = `${index + 1}/${tutorialSteps.length}`;
+    btnNextTut.textContent = (index === tutorialSteps.length - 1) ? "Finalizar" : "Siguiente";
+
+    // Encontrar objetivo con Fallback
+    let targetEl = null;
+    if (step.target) targetEl = document.querySelector(step.target);
+    if (!targetEl && step.fallback) targetEl = document.querySelector(step.fallback);
+
+    if (targetEl) {
+        targetEl.classList.add('tutorial-highlight');
+
+        const rect = targetEl.getBoundingClientRect();
+        // Dimensiones estimadas de la caja (para cálculos de bordes)
+        const boxW = 350;
+        const boxH = 200;
+
+        // CRITERIO: ¿Es un elemento grande (Grid, Chat)? -> CENTRAR
+        const isLarge = (rect.height > window.innerHeight * 0.4) || (rect.width > window.innerWidth * 0.5);
+
+        if (isLarge) {
+            // Centro de pantalla
+            tutorialBox.style.top = '50%';
+            tutorialBox.style.left = '50%';
+            tutorialBox.style.transform = 'translate(-50%, -50%)';
+        } else {
+            // Adyacente (Elemento pequeño)
+            tutorialBox.style.transform = 'none';
+
+            // Intentar poner ABAJO
+            let top = rect.bottom + 20;
+            let left = rect.left + (rect.width / 2) - (boxW / 2);
+
+            // Si se sale por abajo, poner ARRIBA
+            if (top + boxH > window.innerHeight) {
+                top = rect.top - boxH - 20;
+            }
+
+            // Corregir bordes laterales
+            if (left < 20) left = 20;
+            if (left + boxW > window.innerWidth) left = window.innerWidth - boxW - 20;
+
+            tutorialBox.style.top = `${top}px`;
+            tutorialBox.style.left = `${left}px`;
+        }
+    } else {
+        // Paso sin target (Bienvenida)
+        tutorialBox.style.top = '50%';
+        tutorialBox.style.left = '50%';
+        tutorialBox.style.transform = 'translate(-50%, -50%)';
+    }
+}
+
+function endTutorial() {
+    // Desactivar AMBOS elementos
+    if (tutorialOverlay) tutorialOverlay.classList.remove('active');
+    if (tutorialBox) tutorialBox.classList.remove('active');
+
+    setTimeout(() => {
+        if (tutorialOverlay) tutorialOverlay.classList.add('hidden');
+        if (tutorialBox) tutorialBox.classList.add('hidden');
+        // Clean up highlights
+        document.querySelectorAll('.tutorial-highlight').forEach(el => {
+            el.classList.remove('tutorial-highlight');
+        });
+    }, 300);
+    localStorage.setItem('tutorial_completed', 'true');
+}
+
+// Tutorial Events
+if (btnNextTut) {
+    btnNextTut.addEventListener('click', () => {
+        currentStepIndex++;
+        showStep(currentStepIndex);
+    });
+}
+
+if (btnSkipTut) {
+    btnSkipTut.addEventListener('click', () => {
+        endTutorial();
+    });
+}
+
+// Start Init
+// document.addEventListener('DOMContentLoaded', initTutorial);
