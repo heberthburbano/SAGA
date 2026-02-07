@@ -311,6 +311,8 @@ body {
 /* --- FEED & CARDS --- */
 .feed-container {
     flex: 1;
+    min-height: 0;
+    /* CRÍTICO: Rompe el cálculo automático de altura en flexbox para activar scroll */
     overflow-y: auto;
     padding: 15px;
     display: flex;
@@ -327,6 +329,8 @@ body {
 }
 
 .robbery-card {
+    flex-shrink: 0;
+    /* CRÍTICO: Impide que las tarjetas se encojan, forzando el scroll */
     background: rgba(40, 40, 40, 0.4);
 
     body.light-mode & {
